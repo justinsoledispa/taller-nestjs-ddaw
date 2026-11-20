@@ -1,49 +1,45 @@
-
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { Foto } from './entities/foto.entity.js';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Foto } from './entities/foto.entity.js';
 
 @Injectable()
 export class FotosService {
-  private fotos: Foto[] = [
-    { id: 1, titulo: 'Atardecer', calificacion: 4.5 },
-    { id: 2, titulo: 'Malecón', calificacion: 4.0 },
-  ];
+  constructor(
+    @InjectRepository(Foto)
+    private readonly fotosRepo: Repository<Foto>,
+  ) {}
 
-  findAll(): Foto[] {
-    return this.fotos;
+  findAll(): Promise<Foto[]> {
+    return this.fotosRepo.find({ order: { id: 'ASC' } });
   }
 
-  findOne(id: number): Foto {
-    const foto = this.fotos.find((f) => f.id === id);
-    if (!foto) {
-      throw new NotFoundException(`Foto ${id} no encontrada`);
-    }
+  async findOne(id: number): Promise<Foto> {
+    const foto = await this.fotosRepo.findOneBy({ id });
+    if (!foto) throw new NotFoundException(`Foto ${id} no encontrada`);
     return foto;
   }
 
-  create(datos: Omit<Foto, 'id'>): Foto {
-    const nueva = { id: this.fotos.length + 1, ...datos };
-    this.fotos.push(nueva);
-    return nueva;
+  create(datos: Partial<Foto>): Promise<Foto> {
+    const foto = this.fotosRepo.create(datos);
+    return this.fotosRepo.save(foto);
   }
 
+  async update(id: number, datos: Partial<Foto>): Promise<Foto> {
+    if (Object.keys(datos).length === 0) return this.findOne(id);
 
-update(id: number, datos: Partial<Omit<Foto, 'id'>>): Foto {
-  const foto = this.findOne(id);
+    const result = await this.fotosRepo.update(id, datos);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Foto ${id} no encontrada`);
+    }
 
-  Object.assign(foto, datos);
+    return this.findOne(id);
+  }
 
-  return foto;
-}
-
-remove(id: number): void {
-  this.findOne(id);
-
-  const index = this.fotos.findIndex(
-    foto => foto.id === id,
-  );
-
-  this.fotos.splice(index, 1);
-}
-
+  async remove(id: number): Promise<void> {
+    const result = await this.fotosRepo.delete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Foto ${id} no encontrada`);
+    }
+  }
 }
