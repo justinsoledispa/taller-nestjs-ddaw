@@ -3,6 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Foto } from './entities/foto.entity.js';
 
+export interface FiltroFotos {
+  min: number;
+  max: number;
+  q?: string;
+  page: number;
+  limit: number;
+}
+
 @Injectable()
 export class FotosService {
   constructor(
@@ -10,12 +18,39 @@ export class FotosService {
     private readonly fotosRepo: Repository<Foto>,
   ) {}
 
-  findAll(): Promise<Foto[]> {
-    return this.fotosRepo.find({ order: { id: 'ASC' } });
+  async findAll({ min, max, q, page, limit }: FiltroFotos): Promise<{
+    data: Foto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const query = this.fotosRepo
+      .createQueryBuilder('foto')
+      .leftJoinAndSelect('foto.album', 'album')
+      .leftJoinAndSelect('foto.etiquetas', 'etiqueta')
+      .where('foto.calificacion BETWEEN :min AND :max', { min, max });
+
+    if (q?.trim()) {
+      query.andWhere(
+        '(foto.titulo ILIKE :q OR foto.descripcion ILIKE :q OR foto.fotografo ILIKE :q)',
+        { q: `%${q.trim()}%` },
+      );
+    }
+
+    const [data, total] = await query
+      .orderBy('foto.id', 'ASC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return { data, total, page, limit };
   }
 
   async findOne(id: number): Promise<Foto> {
-    const foto = await this.fotosRepo.findOneBy({ id });
+    const foto = await this.fotosRepo.findOne({
+      where: { id },
+      relations: { album: true, etiquetas: true },
+    });
     if (!foto) throw new NotFoundException(`Foto ${id} no encontrada`);
     return foto;
   }
