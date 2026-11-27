@@ -7,6 +7,8 @@ export interface FiltroFotos {
   min: number;
   max: number;
   q?: string;
+  etiqueta?: string;
+  orden?: 'asc' | 'desc';
   page: number;
   limit: number;
 }
@@ -18,7 +20,15 @@ export class FotosService {
     private readonly fotosRepo: Repository<Foto>,
   ) {}
 
-  async findAll({ min, max, q, page, limit }: FiltroFotos): Promise<{
+  async findAll({
+    min,
+    max,
+    q,
+    etiqueta,
+    orden,
+    page,
+    limit,
+  }: FiltroFotos): Promise<{
     data: Foto[];
     total: number;
     page: number;
@@ -30,6 +40,12 @@ export class FotosService {
       .leftJoinAndSelect('foto.etiquetas', 'etiqueta')
       .where('foto.calificacion BETWEEN :min AND :max', { min, max });
 
+    if (etiqueta?.trim()) {
+      query.andWhere('etiqueta.texto = :etiqueta', {
+        etiqueta: etiqueta.trim(),
+      });
+    }
+
     if (q?.trim()) {
       query.andWhere(
         '(foto.titulo ILIKE :q OR foto.descripcion ILIKE :q OR foto.fotografo ILIKE :q)',
@@ -37,8 +53,15 @@ export class FotosService {
       );
     }
 
+    if (orden) {
+      query
+        .orderBy('foto.calificacion', orden === 'asc' ? 'ASC' : 'DESC')
+        .addOrderBy('foto.id', 'ASC');
+    } else {
+      query.orderBy('foto.id', 'ASC');
+    }
+
     const [data, total] = await query
-      .orderBy('foto.id', 'ASC')
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();

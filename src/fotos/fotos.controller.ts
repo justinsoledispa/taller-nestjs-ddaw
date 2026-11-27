@@ -1,5 +1,5 @@
-
 import {
+  BadRequestException,
   Body,
   Controller,
   DefaultValuePipe,
@@ -20,9 +20,7 @@ import type { Foto } from './entities/foto.entity.js';
 
 @Controller('fotos')
 export class FotosController {
-  constructor(
-    private readonly fotosService: FotosService,
-  ) {}
+  constructor(private readonly fotosService: FotosService) {}
 
   @Get()
   findAll(
@@ -31,8 +29,14 @@ export class FotosController {
     @Query('q', new DefaultValuePipe('')) q: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('etiqueta') etiqueta?: string,
+    @Query('orden') orden?: string,
   ) {
-    const filtro: FiltroFotos = { min, max, q, page, limit };
+    if (orden !== undefined && orden !== 'asc' && orden !== 'desc') {
+      throw new BadRequestException('orden debe ser "asc" o "desc"');
+    }
+
+    const filtro: FiltroFotos = { min, max, q, etiqueta, orden, page, limit };
     return this.fotosService.findAll(filtro);
   }
 
