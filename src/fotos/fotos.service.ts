@@ -1,23 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Foto } from './entities/foto.entity.js';
-
-export interface FiltroFotos {
-  min: number;
-  max: number;
-  q?: string;
-  etiqueta?: string;
-  orden?: 'asc' | 'desc';
-  page: number;
-  limit: number;
-}
+import { Etiqueta } from './entities/etiqueta.entity.js';
+import { CreateFotoDto } from './dto/create-foto.dto.js';
+import { QueryFotosDto } from './dto/query-fotos.dto.js';
+import { UpdateFotoDto } from './dto/update-foto.dto.js';
 
 @Injectable()
 export class FotosService {
   constructor(
     @InjectRepository(Foto)
     private readonly fotosRepo: Repository<Foto>,
+    @InjectRepository(Etiqueta)
+    private readonly etiquetasRepo: Repository<Etiqueta>,
   ) {}
 
   async findAll({
@@ -28,7 +24,7 @@ export class FotosService {
     orden,
     page,
     limit,
-  }: FiltroFotos): Promise<{
+  }: QueryFotosDto): Promise<{
     data: Foto[];
     total: number;
     page: number;
@@ -78,26 +74,62 @@ export class FotosService {
     return foto;
   }
 
-  create(datos: Partial<Foto>): Promise<Foto> {
-    const foto = this.fotosRepo.create(datos);
-    return this.fotosRepo.save(foto);
+  async create({ albumId, etiquetas, ...datos }: CreateFotoDto): Promise<Foto> {
+    const foto = this.fotosRepo.create({
+      ...datos,
+      album: albumId === undefined ? null : ({ id: albumId } as Foto['album']),
+      etiquetas: await this.buscarOCrearEtiquetas(etiquetas),
+    });
+    const guardada = await this.fotosRepo.save(foto);
+    return this.findOne(guardada.id);
   }
 
-  async update(id: number, datos: Partial<Foto>): Promise<Foto> {
-    if (Object.keys(datos).length === 0) return this.findOne(id);
+  async update(
+    id: number,
+    { albumId, etiquetas, ...datos }: UpdateFotoDto,
+  ): Promise<Foto> {
+    const foto = await this.fotosRepo.findOne({
+      where: { id },
+      relations: { album: true, etiquetas: true },
+    });
+    if (!foto) throw new NotFoundException(`Foto ${id} no encontrada`);
 
-    const result = await this.fotosRepo.update(id, datos);
-    if (result.affected === 0) {
-      throw new NotFoundException(`Foto ${id} no encontrada`);
+    Object.assign(foto, datos);
+    if (albumId !== undefined) {
+      foto.album =
+        albumId === null
+          ? null
+          : ({ id: albumId } as NonNullable<Foto['album']>);
+    }
+    if (etiquetas !== undefined) {
+      foto.etiquetas = await this.buscarOCrearEtiquetas(etiquetas);
     }
 
+    await this.fotosRepo.save(foto);
     return this.findOne(id);
   }
 
   async remove(id: number): Promise<void> {
-    const result = await this.fotosRepo.delete(id);
-    if (result.affected === 0) {
-      throw new NotFoundException(`Foto ${id} no encontrada`);
-    }
+    const foto = await this.fotosRepo.findOne({ where: { id } });
+    if (!foto) throw new NotFoundException(`Foto ${id} no encontrada`);
+    await this.fotosRepo.remove(foto);
+  }
+
+  private async buscarOCrearEtiquetas(
+    textos: string[] = [],
+  ): Promise<Etiqueta[]> {
+    const limpios = [
+      ...new Set(textos.map((texto) => texto.trim().toLowerCase())),
+    ];
+    if (limpios.length === 0) return [];
+
+    const existentes = await this.etiquetasRepo.findBy({ texto: In(limpios) });
+    const nuevas = limpios
+      .filter(
+        (texto) => !existentes.some((etiqueta) => etiqueta.texto === texto),
+      )
+      .map((texto) => this.etiquetasRepo.create({ texto }));
+
+    return [...existentes, ...(await this.etiquetasRepo.save(nuevas))];
   }
 }

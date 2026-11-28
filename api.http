@@ -1,0 +1,71 @@
+@api = http://localhost:3000/api
+@fotoId = 1
+@albumId = 1
+
+### Listar fotos con filtros, etiquetas y paginación
+GET {{api}}/fotos?min=3&max=5&q=foto&page=1&limit=5&etiqueta=playa&orden=desc
+
+### Crear foto
+POST {{api}}/fotos
+Content-Type: application/json
+
+{
+  "titulo": "Cerro Santa Ana",
+  "descripcion": "Vista de la ciudad al atardecer",
+  "fotografo": "Ana Pérez",
+  "calificacion": 4.8,
+  "ruta": "https://picsum.photos/id/1/600/400",
+  "albumId": 1,
+  "etiquetas": ["ciudad", "faro"]
+}
+
+### Consultar una foto
+GET {{api}}/fotos/{{fotoId}}
+
+### Actualizar foto y reemplazar etiquetas
+PATCH {{api}}/fotos/{{fotoId}}
+Content-Type: application/json
+
+{
+  "calificacion": 5,
+  "etiquetas": ["favorita"]
+}
+
+### Eliminar foto (204 sin cuerpo)
+DELETE {{api}}/fotos/{{fotoId}}
+
+### Listar álbumes
+GET {{api}}/albumes
+
+### Crear álbum
+POST {{api}}/albumes
+Content-Type: application/json
+
+{
+  "nombre": "Escapadas"
+}
+
+### Consultar un álbum y sus fotos
+GET {{api}}/albumes/{{albumId}}/fotos
+
+### Renombrar álbum
+PATCH {{api}}/albumes/{{albumId}}
+Content-Type: application/json
+
+{
+  "nombre": "Viajes favoritos"
+}
+
+### Eliminar álbum (las fotos quedan sin álbum)
+DELETE {{api}}/albumes/{{albumId}}
+
+### Ejemplo inválido: devuelve 400 y una lista de errores de validación
+POST {{api}}/fotos
+Content-Type: application/json
+
+{
+  "titulo": "",
+  "calificacion": 9,
+  "ruta": "no-es-una-url",
+  "campoExtra": true
+}

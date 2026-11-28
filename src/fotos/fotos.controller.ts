@@ -1,12 +1,9 @@
 import {
-  BadRequestException,
   Body,
   Controller,
-  DefaultValuePipe,
   Get,
   Param,
   ParseIntPipe,
-  ParseFloatPipe,
   Post,
   Patch,
   Delete,
@@ -15,28 +12,16 @@ import {
 } from '@nestjs/common';
 
 import { FotosService } from './fotos.service.js';
-import type { FiltroFotos } from './fotos.service.js';
-import type { Foto } from './entities/foto.entity.js';
+import { CreateFotoDto } from './dto/create-foto.dto.js';
+import { QueryFotosDto } from './dto/query-fotos.dto.js';
+import { UpdateFotoDto } from './dto/update-foto.dto.js';
 
 @Controller('fotos')
 export class FotosController {
   constructor(private readonly fotosService: FotosService) {}
 
   @Get()
-  findAll(
-    @Query('min', new DefaultValuePipe(0), ParseFloatPipe) min: number,
-    @Query('max', new DefaultValuePipe(5), ParseFloatPipe) max: number,
-    @Query('q', new DefaultValuePipe('')) q: string,
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-    @Query('etiqueta') etiqueta?: string,
-    @Query('orden') orden?: string,
-  ) {
-    if (orden !== undefined && orden !== 'asc' && orden !== 'desc') {
-      throw new BadRequestException('orden debe ser "asc" o "desc"');
-    }
-
-    const filtro: FiltroFotos = { min, max, q, etiqueta, orden, page, limit };
+  findAll(@Query() filtro: QueryFotosDto) {
     return this.fotosService.findAll(filtro);
   }
 
@@ -46,15 +31,12 @@ export class FotosController {
   }
 
   @Post()
-  create(@Body() datos: Omit<Foto, 'id'>) {
+  create(@Body() datos: CreateFotoDto) {
     return this.fotosService.create(datos);
   }
 
   @Patch(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() datos: Partial<Omit<Foto, 'id'>>,
-  ) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() datos: UpdateFotoDto) {
     return this.fotosService.update(id, datos);
   }
 
